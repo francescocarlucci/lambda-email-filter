@@ -7,6 +7,10 @@ whitelist = [
     'codeable.io'
 ]
 
+stop_phrases = []
+
+total_links_threshold = 5
+    
 def get_email_message(message_id):
     
     # make sure to match your WorkMail AWS region
@@ -28,6 +32,8 @@ def lambda_handler(event, context):
         
         from_domain = from_address.split('@')[1]
         
+        recipients = event['envelope']['recipients']
+        
         subject = event['subject']
         
         flow_direction = event['flowDirection']
@@ -45,21 +51,35 @@ def lambda_handler(event, context):
             action_type = 'BYPASS_SPAM_CHECK'
             
         else:
-        
-            # extract all the email links
-            email_links = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', full_message)
             
-            #print(email_links) # DEBUG
-            
-            print(f"The message contains {len(email_links)} links")
-            
-            # if the message contains more than X links, is probably SPAM
-            if( len(email_links) > 4 ):
+            for phrase in stop_phrases:
                 
-                action_type = 'MOVE_TO_JUNK'
+                if phrase in full_message.lower():
+                    
+                    print(f"The message contains stopwords: {phrase}")
+                    
+                    action_type = 'MOVE_TO_JUNK'
+                    
+                    break
+                    
+            if action_type == 'DEFAULT':
+        
+                # extract all the email links
+                email_links = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', full_message)
+                
+                #print(email_links) # DEBUG
+                
+                print(f"The message contains {len(email_links)} links")
+                
+                # if the message contains more than X links, is probably SPAM
+                if( len(email_links) > total_links_threshold ):
+                    
+                    action_type = 'MOVE_TO_JUNK'
     
     except Exception as e:
+        
         print(e)
+        
         raise e
     
     print(f"Returning action type: {action_type}")
